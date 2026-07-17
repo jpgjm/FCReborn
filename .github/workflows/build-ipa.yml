@@ -1,0 +1,87 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode versions available
+        run: |
+          ls /Applications | grep Xcode || true
+          xcodebuild -version
+
+      - name: Select latest stable Xcode
+        run: |
+          # macos-15 は Xcode 16 系がプリインストール済み。
+          # 明示的にバージョンを固定したい時はここで sudo xcode-select する。
+          sudo xcode-select -p
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Show project structure
+        run: |
+          ls -la
+          ls -la FCReborn.xcodeproj || true
+
+      - name: Build (archive, unsigned)
+        run: |
+          set -euxo pipefail
+          mkdir -p build
+          xcodebuild \
+            -project FCReborn.xcodeproj \
+            -scheme FCReborn \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/FCReborn.xcarchive \
+            -allowProvisioningUpdates \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            ENABLE_BITCODE=NO \
+            archive
+
+      - name: Package IPA (no signing)
+        run: |
+          set -euxo pipefail
+          cd build
+          rm -rf Payload
+          mkdir -p Payload
+          # xcarchive 内の .app を Payload/ にコピーして zip → 拡張子を .ipa に
+          cp -R FCReborn.xcarchive/Products/Applications/FCReborn.app Payload/
+          zip -qr FCReborn-unsigned.ipa Payload
+          ls -la
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FCReborn-unsigned-ipa
+          path: build/FCReborn-unsigned.ipa
+          retention-days: 30
+
+      - name: Attach IPA to release (only on tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/FCReborn-unsigned.ipa
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

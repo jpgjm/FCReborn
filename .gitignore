@@ -1,0 +1,27 @@
+# Xcode / Swift
+build/
+DerivedData/
+*.xcodeproj
+!*.xcodeproj/project.pbxproj
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+xcuserdata/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# XcodeGen が生成するプロジェクト (CIで毎回生成する想定)
+FCReborn.xcodeproj/
+
+# macOS
+.DS_Store
+
+# CocoaPods (使わないが念のため)
+Pods/
+
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+.swiftpm/
